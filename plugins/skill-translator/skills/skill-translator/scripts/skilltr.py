@@ -6,6 +6,9 @@ Subcommands
   save    --input FILE [--lang ko]         merge translated items into the translation cache
   build   [--lang ko] [--project DIR]      write the translated catalog (Markdown + HTML)
   check   [--lang ko] [--project DIR]      SessionStart hook: notice if anything is untranslated
+  apply   [--project DIR]                  prefix the translated summary onto on-disk skill descriptions
+                                           (shown in the / menu; backed up; re-applied by `check`)
+  restore                                  put every modified file back and turn `apply` off
 
 The script never modifies any installed SKILL.md. Translations live in
 ~/.claude/skill-translations/<lang>.json and are reused until the source text changes.
@@ -33,6 +36,8 @@ CLAUDE_HOME = Path(os.environ.get("CLAUDE_CONFIG_DIR", Path.home() / ".claude"))
 OUT_DIR = CLAUDE_HOME / "skill-translations"
 # User settings live outside the skill folder so plugin updates don't reset them.
 CONFIG_PATH = OUT_DIR / "config.json"
+APPLIED_PATH = OUT_DIR / "applied.json"
+BACKUP_DIR = OUT_DIR / "backups"
 
 
 # ---------- config ----------
@@ -180,6 +185,9 @@ def collect_from(root, source, prefix=""):
 
 def make_item(name, kind, source, path, fm, body):
     desc = str(fm.get("description") or "").strip() or first_body_line(body)
+    applied = load_json(APPLIED_PATH, {}).get(str(path))
+    if applied and desc == applied["applied"]:
+        desc = applied["original"]  # our own prefixed text; translate/compare against the original
     when = str(fm.get("when_to_use") or fm.get("when-to-use") or "").strip()
     text = desc + ("\n\nWhen to use: " + when if when else "")
     return {
@@ -224,6 +232,104 @@ def cmd_scan(args):
     }, ensure_ascii=False, indent=2))
 
 
+# ---------- menu (apply / restore) ----------
+
+def replace_description(text, new_desc):
+    """Swap the frontmatter `description` entry (any YAML scalar style) for a double-quoted one."""
+    m = re.match(r"^(﻿?---\s*\r?\n)(.*?)(\r?\n---\s*(?:\r?\n|$))", text, re.S)
+    if not m:
+        return None
+    nl = "\r\n" if "\r\n" in m.group(2) else "\n"
+    lines, out, i, done = m.group(2).split(nl), [], 0, False
+    new_line = "description: " + json.dumps(new_desc, ensure_ascii=False)
+    while i < len(lines):
+        line = lines[i]
+        i += 1
+        if not done and re.match(r"^description:", line):
+            val = line.split(":", 1)[1].strip()
+            if val[:1] in (">", "|") or val[:1] not in ('"', "'"):
+                while i < len(lines) and (lines[i][:1] in (" ", "\t") or not lines[i].strip()):
+                    i += 1
+            elif not (len(val) > 1 and val.endswith(val[0]) and not val.endswith("\\" + val[0])):
+                while i < len(lines):
+                    i += 1
+                    if lines[i - 1].rstrip().endswith(val[0]):
+                        break
+            out.append(new_line)
+            done = True
+        else:
+            out.append(line)
+    if not done:
+        out.append(new_line)
+    return m.group(1) + nl.join(out) + m.group(3) + text[m.end():]
+
+
+def menu_text(summary, original):
+    return f"{summary} · {original}"
+
+
+def apply_translations(project=None, quiet=False):
+    lang = current_lang()
+    cache = load_json(cache_path(lang), {})
+    applied = load_json(APPLIED_PATH, {})
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    done, skipped = 0, []
+    for it in discover(project):
+        entry = cache.get(it["id"])
+        if not entry or entry.get("hash") != it["hash"] or not entry.get("summary"):
+            skipped.append(it["name"])
+            continue
+        path = Path(it["path"])
+        new_desc = menu_text(entry["summary"], it["description"])
+        raw = path.read_bytes()
+        text = raw.decode("utf-8", errors="replace")  # bytes keep CRLF/LF exactly as shipped
+        fm, _ = parse_frontmatter(text)
+        if str(fm.get("description", "")).strip() == new_desc:
+            continue
+        updated = replace_description(text, new_desc)
+        if updated is None:
+            skipped.append(it["name"])
+            continue
+        backup = BACKUP_DIR / (hashlib.sha1(str(path).encode()).hexdigest()[:16] + ".md")
+        if str(path) not in applied or not backup.exists():
+            backup.write_bytes(raw)
+        path.write_bytes(updated.encode("utf-8"))
+        applied[str(path)] = {"id": it["id"], "original": it["description"], "applied": new_desc,
+                              "backup": str(backup), "lang": lang}
+        done += 1
+    save_json(APPLIED_PATH, applied)
+    if not quiet:
+        print(json.dumps({"applied": done, "already_applied_or_unchanged": len(applied) - done,
+                          "skipped_untranslated": skipped}, ensure_ascii=False, indent=2))
+    return done
+
+
+def cmd_apply(args):
+    cfg = load_config()
+    cfg["apply_to_menu"] = True
+    save_json(CONFIG_PATH, cfg)
+    apply_translations(args.project)
+    print("새 세션부터 / 메뉴에 반영됩니다. (Takes effect in new sessions.)")
+
+
+def cmd_restore(args):
+    cfg = load_config()
+    cfg["apply_to_menu"] = False
+    save_json(CONFIG_PATH, cfg)
+    applied = load_json(APPLIED_PATH, {})
+    restored = 0
+    for path, rec in list(applied.items()):
+        p = Path(path)
+        if p.exists():
+            fm, _ = parse_frontmatter(p.read_bytes().decode("utf-8", errors="replace"))
+            if str(fm.get("description", "")).strip() == rec["applied"]:
+                p.write_bytes(Path(rec["backup"]).read_bytes())
+                restored += 1
+        del applied[path]
+    save_json(APPLIED_PATH, applied)
+    print(f"restored {restored} files")
+
+
 def cmd_check(args):
     """SessionStart hook: print a notice only when installed skills lack a translation."""
     project = args.project
@@ -233,6 +339,11 @@ def cmd_check(args):
         except (json.JSONDecodeError, ValueError):
             pass
     lang = current_lang(args.lang)
+    if load_config().get("apply_to_menu"):
+        try:
+            apply_translations(project, quiet=True)  # re-apply after plugin updates overwrite files
+        except Exception:
+            pass
     cache = load_json(cache_path(lang), {})
     items = discover(project)
     new = [it["name"] for it in items if it["id"] not in cache]
@@ -392,9 +503,12 @@ def main():
     k = sub.add_parser("check")
     k.add_argument("--lang")
     k.add_argument("--project")
+    a = sub.add_parser("apply")
+    a.add_argument("--project")
+    sub.add_parser("restore")
     args = p.parse_args()
     {"config": cmd_config, "scan": cmd_scan, "save": cmd_save, "build": cmd_build,
-     "check": cmd_check}[args.cmd](args)
+     "check": cmd_check, "apply": cmd_apply, "restore": cmd_restore}[args.cmd](args)
 
 
 if __name__ == "__main__":

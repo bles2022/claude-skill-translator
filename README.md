@@ -16,8 +16,9 @@ Claude Code에 설치된 스킬·플러그인 스킬·슬래시 명령어의 **�
 ## 특징
 
 - **API 키가 필요 없습니다** — 번역은 지금 쓰고 있는 Claude가 직접 합니다.
-- **원본 스킬 파일은 건드리지 않습니다** — 번역본은 별도 목록으로만 만듭니다.
-  (스킬 설명은 Claude가 "언제 이 스킬을 쓸지" 판단하는 기준이라 바꾸면 오작동할 수 있고, 플러그인 업데이트 때 덮어써집니다.)
+- **`/` 메뉴에도 한국어 표시 (선택)** — 원하면 스킬 설명 앞에 한국어 요약을 붙여 메뉴에서 바로 보이게 합니다.
+  영어 원문은 그대로 남겨 Claude의 스킬 선택에는 영향이 없고, 원본은 백업되며 언제든 되돌릴 수 있습니다.
+  플러그인 업데이트로 덮어써지면 다음 세션 시작 때 자동으로 다시 붙입니다.
 - **바뀐 것만 다시 번역합니다** — 한 번 번역한 스킬은 저장해 두고, 새로 설치됐거나 원문이 바뀐 스킬만 번역합니다.
 - **새 스킬 자동 알림** — 세션을 시작할 때 번역 안 된 스킬이 있으면 알려 줍니다.
 - **30개국 언어 설정** — 한국, 일본, 중국, 대만, 베트남, 태국, 인도네시아, 독일, 프랑스, 스페인, 브라질 등. 목록에 없으면 언어 코드로 지정.
@@ -61,6 +62,11 @@ Claude Code에서 이렇게 말하면 됩니다:
 | 새로 깔린 스킬만 번역 | `스킬 번역 업데이트해줘` |
 | 언어 바꾸기 | `국가를 일본으로 설정하고 스킬 번역해줘` |
 | 한 번만 다른 언어로 | `스킬 목록 베트남어로 만들어줘` |
+| `/` 메뉴에도 한국어로 보이게 | `메뉴에도 한국어로 보이게 해줘` |
+| 메뉴를 원래대로 | `스킬 설명 원래대로 되돌려줘` |
+
+> `/` 메뉴 표시는 **파일이 내 컴퓨터에 있는 스킬**(개인·프로젝트·플러그인 스킬)만 바뀝니다.
+> claude.ai 계정 스킬(`anthropic-skills:*`)과 내장 명령(`/loop` 등)은 앱이 관리하므로 바뀌지 않습니다 — 이런 스킬은 HTML 목록에서 보세요.
 
 결과물은 `~/.claude/skill-translations/` 폴더에 생깁니다:
 
@@ -85,7 +91,9 @@ A Claude Code plugin that translates the descriptions of your installed skills, 
 into your language (Korean by default) and builds a searchable Markdown/HTML catalog.
 
 - No API key — the Claude you are already using does the translating.
-- Never modifies installed `SKILL.md` files; output is a separate catalog.
+- Optional: show translations in the `/` menu by prefixing a translated summary to on-disk skill
+  descriptions (English kept, originals backed up, `restore` undoes it, re-applied after plugin updates).
+  claude.ai account skills and built-in commands are app-managed and stay unchanged.
 - Caches translations and only re-translates new or changed skills.
 - SessionStart hook tells you when new skills are untranslated.
 - Pick a country (`JP`, `VN`, `DE`, `BR`, … 30 built in) or any BCP-47 language code.

@@ -81,6 +81,24 @@ python $S build --project "<현재 작업 폴더>"
 
 `build` 결과의 `stale`(원문이 바뀐 항목)이나 `missing`이 0이 아니면 2단계부터 다시 돌린다.
 
+## / 메뉴에 한국어 표시 (선택)
+
+사용자가 "메뉴에도 한국어로 보이게 해줘"처럼 요청하면:
+
+```
+python $S apply --project "<현재 작업 폴더>"
+```
+
+디스크에 있는 스킬(개인·프로젝트·플러그인)의 description 앞에 번역 요약을 붙인다:
+`<한 줄 요약> · <영어 원문>`. 영어 원문은 그대로 남기므로 Claude의 스킬 선택 기준은 바뀌지 않는다.
+원본은 `~/.claude/skill-translations/backups/`에 백업되고, 플러그인 업데이트로 덮어써지면
+SessionStart 훅이 자동으로 다시 붙인다. 새 세션부터 메뉴에 반영된다.
+
+- 되돌리기: `python $S restore` (모든 파일을 원본으로 되돌리고 자동 적용도 끔)
+- claude.ai 계정 스킬(`anthropic-skills:*`)과 내장 스킬은 앱이 관리하는 파일이라 바꿀 수 없다.
+  사용자가 직접 만든 계정 스킬이면 claude.ai 스킬 설정에서 설명을 고치라고 안내하고,
+  원하면 붙여 넣을 한국어 설명을 만들어 준다.
+
 ## 자동 알림 (SessionStart 훅)
 
 SessionStart 훅(플러그인으로 설치하면 자동 등록, 수동 설치면 `~/.claude/settings.json`)이 세션 시작 때 `skilltr.py check`를 실행해,
