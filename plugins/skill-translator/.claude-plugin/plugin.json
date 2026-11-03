@@ -2,7 +2,7 @@
   "name": "skill-translator",
   "version": "1.1.0",
   "description": "Translate installed Claude Code skill descriptions into your language (Korean by default; set a country to switch) and build a searchable Markdown/HTML catalog. 설치된 스킬 설명을 한국어 등 원하는 언어로 번역해 목록을 만듭니다.",
-  "author": { "name": "a01066486411-ui" },
+  "author": { "name": "bles2022" },
   "license": "MIT",
   "keywords": ["skills", "translation", "i18n", "korean", "localization"]
 }

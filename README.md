@@ -29,7 +29,7 @@ Claude Code에 설치된 스킬·플러그인 스킬·슬래시 명령어의 **�
 Claude Code에서:
 
 ```
-/plugin marketplace add a01066486411-ui/claude-skill-translator
+/plugin marketplace add bles2022/claude-skill-translator
 /plugin install skill-translator@skill-translator
 ```
 
@@ -101,7 +101,7 @@ into your language (Korean by default) and builds a searchable Markdown/HTML cat
 **Install**
 
 ```
-/plugin marketplace add a01066486411-ui/claude-skill-translator
+/plugin marketplace add bles2022/claude-skill-translator
 /plugin install skill-translator@skill-translator
 ```
 
