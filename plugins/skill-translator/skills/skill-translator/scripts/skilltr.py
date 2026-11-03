@@ -251,9 +251,11 @@ def replace_description(text, new_desc):
                 while i < len(lines) and (lines[i][:1] in (" ", "\t") or not lines[i].strip()):
                     i += 1
             elif not (len(val) > 1 and val.endswith(val[0]) and not val.endswith("\\" + val[0])):
+                q = val[0]
                 while i < len(lines):
                     i += 1
-                    if lines[i - 1].rstrip().endswith(val[0]):
+                    end = lines[i - 1].rstrip()
+                    if end.endswith(q) and not (q == '"' and end.endswith('\\"')):
                         break
             out.append(new_line)
             done = True
@@ -261,7 +263,14 @@ def replace_description(text, new_desc):
             out.append(line)
     if not done:
         out.append(new_line)
-    return m.group(1) + nl.join(out) + m.group(3) + text[m.end():]
+    result = m.group(1) + nl.join(out) + m.group(3) + text[m.end():]
+    # Refuse the edit unless re-parsing shows that only `description` changed.
+    before, _ = parse_frontmatter(text)
+    after, _ = parse_frontmatter(result)
+    before.pop("description", None)
+    if after.pop("description", None) != new_desc or after != before:
+        return None
+    return result
 
 
 def menu_text(summary, original):
