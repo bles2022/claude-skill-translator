@@ -1,0 +1,12 @@
+{
+  "name": "skill-translator",
+  "owner": { "name": "a01066486411-ui" },
+  "plugins": [
+    {
+      "name": "skill-translator",
+      "source": "./plugins/skill-translator",
+      "description": "Translate installed Claude Code skill descriptions into your language (Korean by default) and build a searchable catalog.",
+      "version": "1.0.0"
+    }
+  ]
+}
